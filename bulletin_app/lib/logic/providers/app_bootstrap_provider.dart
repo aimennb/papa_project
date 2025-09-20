@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/app_database.dart';
 import '../../data/models/models.dart';
-import '../../data/repositories/bulletin_repository.dart';
+import '../../data/repositories/facture_repository.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -10,13 +10,13 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-final bulletinRepositoryProvider = Provider<BulletinRepository>((ref) {
+final factureRepositoryProvider = Provider<FactureRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  return DriftBulletinRepository(db);
+  return DriftFactureRepository(db);
 });
 
 final appBootstrapProvider = FutureProvider<void>((ref) async {
-  final repo = ref.watch(bulletinRepositoryProvider);
+  final repo = ref.watch(factureRepositoryProvider);
   await repo.bootstrap();
   final params = await repo.loadParametres();
   ref.read(parametresProvider.notifier).setInitial(params);
@@ -26,7 +26,7 @@ class ParametresNotifier extends StateNotifier<AsyncValue<ParametresApp>> {
   ParametresNotifier(this._repository)
       : super(const AsyncValue.loading());
 
-  final BulletinRepository _repository;
+  final FactureRepository _repository;
 
   void setInitial(ParametresApp params) {
     if (!mounted) return;
@@ -57,7 +57,7 @@ class ParametresNotifier extends StateNotifier<AsyncValue<ParametresApp>> {
 final parametresProvider =
     StateNotifierProvider<ParametresNotifier, AsyncValue<ParametresApp>>(
   (ref) {
-    final repo = ref.watch(bulletinRepositoryProvider);
+    final repo = ref.watch(factureRepositoryProvider);
     return ParametresNotifier(repo);
   },
 );

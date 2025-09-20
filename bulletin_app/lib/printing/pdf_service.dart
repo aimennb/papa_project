@@ -19,7 +19,7 @@ class PdfService {
 
   final ParametresApp _parametres;
 
-  Future<Uint8List> buildPdf(BulletinAchat bulletin) async {
+  Future<Uint8List> buildPdf({required Facture facture, required Client client}) async {
     final doc = pw.Document();
     final arabicFont = await _loadArabicFont();
     final baseFont = pw.Font.helvetica();
@@ -31,7 +31,7 @@ class PdfService {
         build: (context) {
           return pw.Directionality(
             textDirection: pw.TextDirection.rtl,
-            child: _buildPage(bulletin, baseFont, arabicFont),
+            child: _buildPage(facture, client, baseFont, arabicFont),
           );
         },
       ),
@@ -41,21 +41,22 @@ class PdfService {
   }
 
   pw.Widget _buildPage(
-    BulletinAchat bulletin,
+    Facture facture,
+    Client client,
     pw.Font baseFont,
     pw.Font? arabicFont,
   ) {
     final headers = _buildTableHeader(baseFont, arabicFont);
-    final body = bulletin.lignes.map((ligne) {
+    final body = facture.lignes.map((ligne) {
       return _buildRow(ligne, baseFont);
     }).toList();
 
-    final total = bulletin.total.toStringAsFixed(2);
+    final total = facture.total.toStringAsFixed(2);
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _buildHeader(bulletin, baseFont, arabicFont),
+        _buildHeader(facture, client, baseFont, arabicFont),
         pw.SizedBox(height: 8),
         pw.Table(
           border: pw.TableBorder.all(width: 0.8),
@@ -81,7 +82,8 @@ class PdfService {
                   padding: const pw.EdgeInsets.all(4),
                   child: pw.Text(
                     'TOTAL / المجموع',
-                    style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
+                    style:
+                        pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
                   ),
                 ),
                 pw.SizedBox(),
@@ -91,7 +93,8 @@ class PdfService {
                   padding: const pw.EdgeInsets.all(4),
                   child: pw.Text(
                     _parametres.devise,
-                    style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
+                    style:
+                        pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
                     textAlign: pw.TextAlign.right,
                   ),
                 ),
@@ -99,7 +102,8 @@ class PdfService {
                   padding: const pw.EdgeInsets.all(4),
                   child: pw.Text(
                     total,
-                    style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
+                    style:
+                        pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
                     textAlign: pw.TextAlign.right,
                   ),
                 ),
@@ -170,7 +174,8 @@ class PdfService {
   }
 
   pw.Widget _buildHeader(
-    BulletinAchat bulletin,
+    Facture facture,
+    Client client,
     pw.Font baseFont,
     pw.Font? arabicFont,
   ) {
@@ -182,14 +187,23 @@ class PdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('KHENOUCI Chabane',
-              style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold)),
           pw.Text('Mandataire en Fruits et Légumes',
               style: pw.TextStyle(font: baseFont, fontSize: 10)),
           pw.Text('Marché de Gros – Eucalyptus',
               style: pw.TextStyle(font: baseFont, fontSize: 10)),
-          pw.Text('Carreau Nº ${bulletin.carreau}',
+          pw.Text('Carreau Nº ${facture.carreau}',
               style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Client: ${client.nom}',
+            style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold),
+          ),
+          if (client.telephone.isNotEmpty)
+            pw.Text('Tél: ${client.telephone}',
+                style: pw.TextStyle(font: baseFont, fontSize: 10)),
+          if (client.region.isNotEmpty)
+            pw.Text('Région: ${client.region}',
+                style: pw.TextStyle(font: baseFont, fontSize: 10)),
         ],
       ),
     );
@@ -200,12 +214,18 @@ class PdfService {
         border: pw.Border.all(width: 1.2),
       ),
       child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.Text('بيان الشراء',
-              style: pw.TextStyle(font: arabicFont ?? baseFont, fontSize: 14)),
-          pw.SizedBox(height: 4),
           pw.Text('BULLETIN D\'ACHAT',
-              style: pw.TextStyle(font: baseFont, fontSize: 14)),
+              style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold)),
+          pw.Text('وصل شراء',
+              style: pw.TextStyle(font: arabicFont ?? baseFont, fontSize: 14),
+              textAlign: pw.TextAlign.center),
+          pw.SizedBox(height: 4),
+          pw.Text('N° ${facture.numero}',
+              style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Date: ${_formatDate(facture.date)}',
+              style: pw.TextStyle(font: baseFont, fontSize: 12)),
         ],
       ),
     );
@@ -218,75 +238,24 @@ class PdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('N° : ${bulletin.numero}',
-              style: pw.TextStyle(font: baseFont, fontWeight: pw.FontWeight.bold)),
-          pw.Text('Marque : ${bulletin.marque}',
-              style: pw.TextStyle(font: baseFont, fontSize: 10)),
-          pw.Text('Cons. : ${bulletin.consignation}',
-              style: pw.TextStyle(font: baseFont, fontSize: 10)),
-          pw.Text('Carreau : ${bulletin.carreau}',
-              style: pw.TextStyle(font: baseFont, fontSize: 10)),
+          pw.Text('Marque: ${facture.marque}',
+              style: pw.TextStyle(font: baseFont, fontSize: 12)),
+          pw.Text('Consignation: ${facture.consignation}',
+              style: pw.TextStyle(font: baseFont, fontSize: 12)),
+          pw.Text('Statut: ${facture.status.label}',
+              style: pw.TextStyle(font: baseFont, fontSize: 12)),
         ],
       ),
     );
 
-    final deliveredRow = pw.Row(
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Expanded(
-          child: pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(width: 1.0),
-            ),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            child: pw.Row(
-              children: [
-                pw.Text('Délivré à : ',
-                    style: pw.TextStyle(font: baseFont, fontSize: 10)),
-                pw.Expanded(
-                  child: pw.Container(
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(bottom: pw.BorderSide(width: 0.6)),
-                    ),
-                    padding: const pw.EdgeInsets.only(bottom: 2),
-                    child: pw.Text(
-                      bulletin.client,
-                      style: pw.TextStyle(font: baseFont, fontSize: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        pw.Expanded(flex: 4, child: leftBox),
         pw.SizedBox(width: 6),
-        pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(width: 1.0),
-          ),
-          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: pw.Text(
-            'Date : ${_formatDate(bulletin.date)}',
-            style: pw.TextStyle(font: baseFont, fontSize: 10),
-          ),
-        ),
-      ],
-    );
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(child: leftBox),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: titleBox),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: rightBox),
-          ],
-        ),
-        pw.SizedBox(height: 6),
-        deliveredRow,
+        pw.Expanded(flex: 3, child: titleBox),
+        pw.SizedBox(width: 6),
+        pw.Expanded(flex: 3, child: rightBox),
       ],
     );
   }
@@ -301,6 +270,9 @@ class PdfService {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    return '$day/$month/$year';
   }
 }

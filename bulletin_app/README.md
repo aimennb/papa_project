@@ -14,7 +14,7 @@ Application Flutter multiplateforme pour la saisie, la gestion et l'impression d
 ```
 lib/
  ├─ data/
- │   ├─ models/                # Modèles métier (Client, LigneAchat, BulletinAchat, ParametresApp)
+ │   ├─ models/                # Modèles métier (Client, Fournisseur, Facture, LigneAchat, ParametresApp)
  │   ├─ local/                 # Base Drift + seed
  │   └─ repositories/          # Abstraction des accès DB
  ├─ logic/

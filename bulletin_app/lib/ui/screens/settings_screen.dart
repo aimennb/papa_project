@@ -5,6 +5,7 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 
 import '../../data/models/models.dart';
 import '../../logic/providers/app_bootstrap_provider.dart';
+import '../../logic/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -33,6 +34,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildForm(ParametresApp params) {
+    final user = ref.watch(currentUserProvider);
+
     return FormBuilder(
       key: _formKey,
       child: ListView(
@@ -85,6 +88,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const InputDecoration(labelText: 'Pied de page personnalisé'),
             initialValue: params.piedDePage,
             maxLines: 2,
+          ),
+          const SizedBox(height: 12),
+          FormBuilderDropdown<UserRole>(
+            name: 'role',
+            decoration:
+                const InputDecoration(labelText: 'Rôle utilisateur local'),
+            initialValue: user.role,
+            items: UserRole.values
+                .map(
+                  (role) => DropdownMenuItem(
+                    value: role,
+                    child: Text(role.label),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                ref.read(currentUserProvider.notifier).setRole(value);
+              }
+            },
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(

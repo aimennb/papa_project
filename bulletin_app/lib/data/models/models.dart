@@ -1,25 +1,109 @@
 import 'package:equatable/equatable.dart';
 
+enum FactureStatus { draft, locked, canceled }
+
+extension FactureStatusSerializer on FactureStatus {
+  String get dbValue => toString().split('.').last.toUpperCase();
+
+  static FactureStatus fromDatabase(String value) {
+    switch (value.toUpperCase()) {
+      case 'LOCKED':
+        return FactureStatus.locked;
+      case 'CANCELED':
+        return FactureStatus.canceled;
+      case 'DRAFT':
+      default:
+        return FactureStatus.draft;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case FactureStatus.draft:
+        return 'Brouillon';
+      case FactureStatus.locked:
+        return 'Verrouillée';
+      case FactureStatus.canceled:
+        return 'Annulée';
+    }
+  }
+}
+
 class Client extends Equatable {
-  final int? id;
+  final String id;
+  final String nom;
+  final String telephone;
+  final String region;
+  final DateTime createdAt;
+
+  const Client({
+    required this.id,
+    required this.nom,
+    required this.telephone,
+    required this.region,
+    required this.createdAt,
+  });
+
+  Client copyWith({
+    String? id,
+    String? nom,
+    String? telephone,
+    String? region,
+    DateTime? createdAt,
+  }) {
+    return Client(
+      id: id ?? this.id,
+      nom: nom ?? this.nom,
+      telephone: telephone ?? this.telephone,
+      region: region ?? this.region,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nom': nom,
+      'telephone': telephone,
+      'region': region,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory Client.fromJson(Map<String, dynamic> json) {
+    return Client(
+      id: json['id'] as String,
+      nom: json['nom'] as String,
+      telephone: json['telephone'] as String,
+      region: json['region'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, nom, telephone, region, createdAt];
+}
+
+class Fournisseur extends Equatable {
+  final String id;
   final String nom;
   final String? telephone;
   final String? adresse;
 
-  const Client({
-    this.id,
+  const Fournisseur({
+    required this.id,
     required this.nom,
     this.telephone,
     this.adresse,
   });
 
-  Client copyWith({
-    int? id,
+  Fournisseur copyWith({
+    String? id,
     String? nom,
     String? telephone,
     String? adresse,
   }) {
-    return Client(
+    return Fournisseur(
       id: id ?? this.id,
       nom: nom ?? this.nom,
       telephone: telephone ?? this.telephone,
@@ -36,9 +120,9 @@ class Client extends Equatable {
     };
   }
 
-  factory Client.fromJson(Map<String, dynamic> json) {
-    return Client(
-      id: json['id'] as int?,
+  factory Fournisseur.fromJson(Map<String, dynamic> json) {
+    return Fournisseur(
+      id: json['id'] as String,
       nom: json['nom'] as String,
       telephone: json['telephone'] as String?,
       adresse: json['adresse'] as String?,
@@ -49,8 +133,73 @@ class Client extends Equatable {
   List<Object?> get props => [id, nom, telephone, adresse];
 }
 
+class Approvisionnement extends Equatable {
+  final String id;
+  final String fournisseurId;
+  final DateTime date;
+  final String marque;
+  final String natureProduit;
+  final int nbColis;
+
+  const Approvisionnement({
+    required this.id,
+    required this.fournisseurId,
+    required this.date,
+    required this.marque,
+    required this.natureProduit,
+    required this.nbColis,
+  });
+
+  bool get estNegatif => nbColis < 0;
+
+  Approvisionnement copyWith({
+    String? id,
+    String? fournisseurId,
+    DateTime? date,
+    String? marque,
+    String? natureProduit,
+    int? nbColis,
+  }) {
+    return Approvisionnement(
+      id: id ?? this.id,
+      fournisseurId: fournisseurId ?? this.fournisseurId,
+      date: date ?? this.date,
+      marque: marque ?? this.marque,
+      natureProduit: natureProduit ?? this.natureProduit,
+      nbColis: nbColis ?? this.nbColis,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'fournisseurId': fournisseurId,
+      'date': date.toIso8601String(),
+      'marque': marque,
+      'natureProduit': natureProduit,
+      'nbColis': nbColis,
+    };
+  }
+
+  factory Approvisionnement.fromJson(Map<String, dynamic> json) {
+    return Approvisionnement(
+      id: json['id'] as String,
+      fournisseurId: json['fournisseurId'] as String,
+      date: DateTime.parse(json['date'] as String),
+      marque: json['marque'] as String,
+      natureProduit: json['natureProduit'] as String,
+      nbColis: json['nbColis'] as int,
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, fournisseurId, date, marque, natureProduit, nbColis];
+}
+
 class LigneAchat extends Equatable {
-  final int? id;
+  final String id;
+  final String? fournisseurId;
   final String marque;
   final int nbColis;
   final String nature;
@@ -60,7 +209,8 @@ class LigneAchat extends Equatable {
   final double prixUnitaire;
 
   const LigneAchat({
-    this.id,
+    required this.id,
+    this.fournisseurId,
     required this.marque,
     required this.nbColis,
     required this.nature,
@@ -76,7 +226,8 @@ class LigneAchat extends Equatable {
   double get montant => netNonZero * prixUnitaire;
 
   LigneAchat copyWith({
-    int? id,
+    String? id,
+    String? fournisseurId,
     String? marque,
     int? nbColis,
     String? nature,
@@ -87,6 +238,7 @@ class LigneAchat extends Equatable {
   }) {
     return LigneAchat(
       id: id ?? this.id,
+      fournisseurId: fournisseurId ?? this.fournisseurId,
       marque: marque ?? this.marque,
       nbColis: nbColis ?? this.nbColis,
       nature: nature ?? this.nature,
@@ -100,6 +252,7 @@ class LigneAchat extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'fournisseurId': fournisseurId,
       'marque': marque,
       'nbColis': nbColis,
       'nature': nature,
@@ -112,7 +265,8 @@ class LigneAchat extends Equatable {
 
   factory LigneAchat.fromJson(Map<String, dynamic> json) {
     return LigneAchat(
-      id: json['id'] as int?,
+      id: json['id'] as String,
+      fournisseurId: json['fournisseurId'] as String?,
       marque: json['marque'] as String,
       nbColis: json['nbColis'] as int,
       nature: json['nature'] as String,
@@ -124,53 +278,83 @@ class LigneAchat extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, marque, nbColis, nature, brut, tare, net, prixUnitaire];
+  List<Object?> get props => [
+        id,
+        fournisseurId,
+        marque,
+        nbColis,
+        nature,
+        brut,
+        tare,
+        net,
+        prixUnitaire,
+      ];
 }
 
-class BulletinAchat extends Equatable {
-  final int? id;
+class Facture extends Equatable {
+  final String id;
   final String numero;
   final DateTime date;
-  final String client;
+  final String clientId;
+  final String clientNom;
   final String marque;
   final String consignation;
   final int carreau;
   final List<LigneAchat> lignes;
+  final FactureStatus status;
+  final String createdBy;
+  final DateTime createdAt;
+  final DateTime? lockedAt;
 
-  const BulletinAchat({
-    this.id,
+  const Facture({
+    required this.id,
     required this.numero,
     required this.date,
-    required this.client,
+    required this.clientId,
+    required this.clientNom,
     required this.marque,
     required this.consignation,
     required this.carreau,
     required this.lignes,
+    required this.status,
+    required this.createdBy,
+    required this.createdAt,
+    this.lockedAt,
   });
 
-  double get total =>
-      lignes.fold<double>(0, (sum, ligne) => sum + ligne.montant);
+  double get total => lignes.fold<double>(0, (sum, ligne) => sum + ligne.montant);
 
-  BulletinAchat copyWith({
-    int? id,
+  bool get isLocked => status == FactureStatus.locked;
+
+  Facture copyWith({
+    String? id,
     String? numero,
     DateTime? date,
-    String? client,
+    String? clientId,
+    String? clientNom,
     String? marque,
     String? consignation,
     int? carreau,
     List<LigneAchat>? lignes,
+    FactureStatus? status,
+    String? createdBy,
+    DateTime? createdAt,
+    DateTime? lockedAt,
   }) {
-    return BulletinAchat(
+    return Facture(
       id: id ?? this.id,
       numero: numero ?? this.numero,
       date: date ?? this.date,
-      client: client ?? this.client,
+      clientId: clientId ?? this.clientId,
+      clientNom: clientNom ?? this.clientNom,
       marque: marque ?? this.marque,
       consignation: consignation ?? this.consignation,
       carreau: carreau ?? this.carreau,
       lignes: lignes ?? List<LigneAchat>.from(this.lignes),
+      status: status ?? this.status,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      lockedAt: lockedAt ?? this.lockedAt,
     );
   }
 
@@ -178,37 +362,62 @@ class BulletinAchat extends Equatable {
     return {
       'id': id,
       'numero': numero,
-      'date': date.millisecondsSinceEpoch,
-      'client': client,
+      'date': date.toIso8601String(),
+      'clientId': clientId,
+      'clientNom': clientNom,
       'marque': marque,
       'consignation': consignation,
       'carreau': carreau,
+      'status': status.dbValue,
+      'createdBy': createdBy,
+      'createdAt': createdAt.toIso8601String(),
+      'lockedAt': lockedAt?.toIso8601String(),
       'lignes': lignes.map((e) => e.toJson()).toList(),
     };
   }
 
-  factory BulletinAchat.fromJson(Map<String, dynamic> json) {
-    final lignesJson = json['lignes'] as List<dynamic>? ?? [];
-    return BulletinAchat(
-      id: json['id'] as int?,
+  factory Facture.fromJson(Map<String, dynamic> json) {
+    return Facture(
+      id: json['id'] as String,
       numero: json['numero'] as String,
-      date: DateTime.fromMillisecondsSinceEpoch(json['date'] as int),
-      client: json['client'] as String,
+      date: DateTime.parse(json['date'] as String),
+      clientId: json['clientId'] as String,
+      clientNom: json['clientNom'] as String,
       marque: json['marque'] as String,
       consignation: json['consignation'] as String,
       carreau: json['carreau'] as int,
-      lignes: lignesJson
+      lignes: (json['lignes'] as List<dynamic>)
           .map((e) => LigneAchat.fromJson(e as Map<String, dynamic>))
           .toList(),
+      status: FactureStatusSerializer.fromDatabase(json['status'] as String),
+      createdBy: json['createdBy'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      lockedAt: (json['lockedAt'] as String?) != null
+          ? DateTime.parse(json['lockedAt'] as String)
+          : null,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [id, numero, date, client, marque, consignation, carreau, lignes];
+  List<Object?> get props => [
+        id,
+        numero,
+        date,
+        clientId,
+        clientNom,
+        marque,
+        consignation,
+        carreau,
+        lignes,
+        status,
+        createdBy,
+        createdAt,
+        lockedAt,
+      ];
 }
 
 class ParametresApp extends Equatable {
+  final String id;
   final String prefixNumero;
   final int prochainCompteur;
   final int carreauParDefaut;
@@ -217,6 +426,7 @@ class ParametresApp extends Equatable {
   final String langue;
 
   const ParametresApp({
+    required this.id,
     required this.prefixNumero,
     required this.prochainCompteur,
     required this.carreauParDefaut,
@@ -226,6 +436,7 @@ class ParametresApp extends Equatable {
   });
 
   ParametresApp copyWith({
+    String? id,
     String? prefixNumero,
     int? prochainCompteur,
     int? carreauParDefaut,
@@ -234,6 +445,7 @@ class ParametresApp extends Equatable {
     String? langue,
   }) {
     return ParametresApp(
+      id: id ?? this.id,
       prefixNumero: prefixNumero ?? this.prefixNumero,
       prochainCompteur: prochainCompteur ?? this.prochainCompteur,
       carreauParDefaut: carreauParDefaut ?? this.carreauParDefaut,
@@ -245,6 +457,7 @@ class ParametresApp extends Equatable {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'prefixNumero': prefixNumero,
       'prochainCompteur': prochainCompteur,
       'carreauParDefaut': carreauParDefaut,
@@ -256,6 +469,7 @@ class ParametresApp extends Equatable {
 
   factory ParametresApp.fromJson(Map<String, dynamic> json) {
     return ParametresApp(
+      id: json['id'] as String,
       prefixNumero: json['prefixNumero'] as String,
       prochainCompteur: json['prochainCompteur'] as int,
       carreauParDefaut: json['carreauParDefaut'] as int,
@@ -266,6 +480,7 @@ class ParametresApp extends Equatable {
   }
 
   static const defaults = ParametresApp(
+    id: 'app',
     prefixNumero: '',
     prochainCompteur: 1,
     carreauParDefaut: 62,
@@ -276,6 +491,7 @@ class ParametresApp extends Equatable {
 
   @override
   List<Object?> get props => [
+        id,
         prefixNumero,
         prochainCompteur,
         carreauParDefaut,
@@ -283,4 +499,31 @@ class ParametresApp extends Equatable {
         piedDePage,
         langue,
       ];
+}
+
+enum UserRole { admin, facture, fournisseur }
+
+extension UserRoleX on UserRole {
+  String get label {
+    switch (this) {
+      case UserRole.admin:
+        return 'ADMIN';
+      case UserRole.facture:
+        return 'FACTURE';
+      case UserRole.fournisseur:
+        return 'FOURNISSEUR';
+    }
+  }
+
+  static UserRole fromLabel(String value) {
+    switch (value.toUpperCase()) {
+      case 'FOURNISSEUR':
+        return UserRole.fournisseur;
+      case 'FACTURE':
+        return UserRole.facture;
+      case 'ADMIN':
+      default:
+        return UserRole.admin;
+    }
+  }
 }

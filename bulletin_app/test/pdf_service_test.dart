@@ -7,15 +7,19 @@ void main() {
 
   test('buildPdf returns valid document', () async {
     final service = PdfService(ParametresApp.defaults);
-    final bulletin = BulletinAchat(
+    final facture = Facture(
+      id: 'f1',
       numero: '0006196',
       date: DateTime(2023, 8, 28),
-      client: 'Client Test',
+      clientId: 'c1',
+      clientNom: 'Client Test',
       marque: 'Tomate',
       consignation: 'Bacs',
       carreau: 62,
       lignes: const [
         LigneAchat(
+          id: 'l1',
+          fournisseurId: null,
           marque: 'DZ',
           nbColis: 10,
           nature: 'Tomates',
@@ -25,9 +29,20 @@ void main() {
           prixUnitaire: 80,
         ),
       ],
+      status: FactureStatus.draft,
+      createdBy: 'tester',
+      createdAt: DateTime(2023, 8, 28, 8),
+      lockedAt: null,
+    );
+    final client = Client(
+      id: 'c1',
+      nom: 'Client Test',
+      telephone: '0555 010101',
+      region: 'Alger',
+      createdAt: DateTime(2023, 1, 1),
     );
 
-    final bytes = await service.buildPdf(bulletin);
+    final bytes = await service.buildPdf(facture: facture, client: client);
     expect(bytes, isNotEmpty);
     final header = String.fromCharCodes(bytes.sublist(0, 4));
     expect(header, '%PDF');
