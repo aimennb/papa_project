@@ -1,0 +1,12 @@
+{
+  "appTitle": "Bulletin d'achat",
+  "listTitle": "Bulletins d'achat",
+  "newBulletin": "Nouveau",
+  "settings": "Paramètres",
+  "search": "Rechercher",
+  "noBulletin": "Aucun bulletin",
+  "saved": "Enregistré",
+  "pdfGenerated": "PDF généré",
+  "pdfError": "Erreur PDF",
+  "shareError": "Erreur partage"
+}
