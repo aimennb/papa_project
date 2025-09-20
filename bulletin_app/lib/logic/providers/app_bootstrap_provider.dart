@@ -1,8 +1,12 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import '../../data/local/app_database.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/facture_repository.dart';
+import '../../data/repositories/sync_repository.dart';
+import 'sync_controller.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -13,6 +17,31 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final factureRepositoryProvider = Provider<FactureRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return DriftFactureRepository(db);
+});
+
+final httpClientProvider = Provider<http.Client>((ref) {
+  final client = http.Client();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final syncRepositoryProvider = Provider<SyncRepository>((ref) {
+  final db = ref.watch(databaseProvider);
+  final client = ref.watch(httpClientProvider);
+  return SyncRepository(db, client);
+});
+
+final syncControllerProvider =
+    StateNotifierProvider<SyncController, SyncState>((ref) {
+  final repository = ref.watch(syncRepositoryProvider);
+  final controller = SyncController(
+    repository,
+    Connectivity(),
+    ref,
+    parametresProvider: parametresProvider,
+  );
+  controller.initialize();
+  return controller;
 });
 
 final appBootstrapProvider = FutureProvider<void>((ref) async {

@@ -38,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -51,6 +51,9 @@ class AppDatabase extends _$AppDatabase {
             await _dropLegacySchema();
             await _createSchema();
             await _seedDefaults();
+          }
+          if (from < 3) {
+            await _migrateToV3();
           }
         },
       );
@@ -143,6 +146,15 @@ class AppDatabase extends _$AppDatabase {
         at INTEGER NOT NULL
       );
     ''');
+
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS sync_metadata (
+        id TEXT PRIMARY KEY,
+        last_synced_at INTEGER,
+        last_status TEXT NOT NULL,
+        last_error TEXT
+      );
+    ''');
   }
 
   Future<void> _dropLegacySchema() async {
@@ -155,6 +167,7 @@ class AppDatabase extends _$AppDatabase {
       'clients',
       'parametres',
       'audit_logs',
+      'sync_metadata',
     ];
     for (final table in legacyTables) {
       await customStatement('DROP TABLE IF EXISTS ' + table);
@@ -163,8 +176,8 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _seedDefaults() async {
     await customStatement(
-      'INSERT OR IGNORE INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue, remote_endpoint, sync_enabled, sync_interval_minutes) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         ParametresApp.defaults.id,
         ParametresApp.defaults.prefixNumero,
@@ -173,6 +186,57 @@ class AppDatabase extends _$AppDatabase {
         ParametresApp.defaults.devise,
         ParametresApp.defaults.piedDePage,
         ParametresApp.defaults.langue,
+        ParametresApp.defaults.remoteEndpoint,
+        ParametresApp.defaults.syncEnabled ? 1 : 0,
+        ParametresApp.defaults.syncIntervalMinutes,
+      ],
+    );
+
+    await customStatement(
+      'INSERT OR IGNORE INTO sync_metadata (id, last_synced_at, last_status, last_error) '
+      'VALUES (?, NULL, ?, NULL)',
+      [
+        SyncMetadata.defaults.id,
+        SyncMetadata.defaults.lastStatus.dbValue,
+      ],
+    );
+  }
+
+  Future<void> _migrateToV3() async {
+    final columns = await customSelect('PRAGMA table_info(parametres)').get();
+    final names = columns.map((row) => row.data['name'] as String).toSet();
+
+    if (!names.contains('remote_endpoint')) {
+      await customStatement(
+        "ALTER TABLE parametres ADD COLUMN remote_endpoint TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (!names.contains('sync_enabled')) {
+      await customStatement(
+        'ALTER TABLE parametres ADD COLUMN sync_enabled INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (!names.contains('sync_interval_minutes')) {
+      await customStatement(
+        'ALTER TABLE parametres ADD COLUMN sync_interval_minutes INTEGER NOT NULL DEFAULT ${ParametresApp.defaults.syncIntervalMinutes}',
+      );
+    }
+
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS sync_metadata (
+        id TEXT PRIMARY KEY,
+        last_synced_at INTEGER,
+        last_status TEXT NOT NULL,
+        last_error TEXT
+      );
+    ''');
+
+    await customStatement(
+      'INSERT OR IGNORE INTO sync_metadata (id, last_synced_at, last_status, last_error) '
+      'VALUES (?, NULL, ?, NULL)',
+      [
+        SyncMetadata.defaults.id,
+        SyncMetadata.defaults.lastStatus.dbValue,
       ],
     );
   }
@@ -367,8 +431,8 @@ class AppDatabase extends _$AppDatabase {
           ParametresApp.defaults.langue;
       final numero = prefix + compteur.toString().padLeft(6, '0');
       await customStatement(
-        'INSERT INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?) '
+        'INSERT INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue, remote_endpoint, sync_enabled, sync_interval_minutes) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
         'ON CONFLICT(id) DO UPDATE SET prochain_compteur=excluded.prochain_compteur, prefix_numero=excluded.prefix_numero, '
         'carreau_par_defaut=excluded.carreau_par_defaut, devise=excluded.devise, pied_de_page=excluded.pied_de_page, langue=excluded.langue',
         [
@@ -379,6 +443,9 @@ class AppDatabase extends _$AppDatabase {
           devise,
           piedDePage,
           langue,
+          ParametresApp.defaults.remoteEndpoint,
+          ParametresApp.defaults.syncEnabled ? 1 : 0,
+          ParametresApp.defaults.syncIntervalMinutes,
         ],
       );
       return numero;
@@ -402,15 +469,20 @@ class AppDatabase extends _$AppDatabase {
       devise: row['devise'] as String,
       piedDePage: row['pied_de_page'] as String,
       langue: row['langue'] as String,
+      remoteEndpoint: row['remote_endpoint'] as String? ?? '',
+      syncEnabled: ((row['sync_enabled'] as int?) ?? 0) == 1,
+      syncIntervalMinutes:
+          (row['sync_interval_minutes'] as int?) ?? ParametresApp.defaults.syncIntervalMinutes,
     );
   }
 
   Future<void> upsertParametres(ParametresApp params) async {
     await customStatement(
-      'INSERT INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?) '
+      'INSERT INTO parametres (id, prefix_numero, prochain_compteur, carreau_par_defaut, devise, pied_de_page, langue, remote_endpoint, sync_enabled, sync_interval_minutes) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
       'ON CONFLICT(id) DO UPDATE SET prefix_numero=excluded.prefix_numero, prochain_compteur=excluded.prochain_compteur, '
-      'carreau_par_defaut=excluded.carreau_par_defaut, devise=excluded.devise, pied_de_page=excluded.pied_de_page, langue=excluded.langue',
+      'carreau_par_defaut=excluded.carreau_par_defaut, devise=excluded.devise, pied_de_page=excluded.pied_de_page, langue=excluded.langue, '
+      'remote_endpoint=excluded.remote_endpoint, sync_enabled=excluded.sync_enabled, sync_interval_minutes=excluded.sync_interval_minutes',
       [
         params.id,
         params.prefixNumero,
@@ -419,8 +491,155 @@ class AppDatabase extends _$AppDatabase {
         params.devise,
         params.piedDePage,
         params.langue,
+        params.remoteEndpoint,
+        params.syncEnabled ? 1 : 0,
+        params.syncIntervalMinutes,
       ],
     );
+  }
+
+  Future<SyncMetadata> loadSyncMetadata() async {
+    final rows = await customSelect(
+      'SELECT * FROM sync_metadata WHERE id = ? LIMIT 1',
+      variables: [Variable.withString(SyncMetadata.defaults.id)],
+    ).get();
+    if (rows.isEmpty) {
+      return SyncMetadata.defaults;
+    }
+    final data = rows.first.data;
+    return SyncMetadata(
+      id: data['id'] as String,
+      lastSyncedAt: data['last_synced_at'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(data['last_synced_at'] as int)
+          : null,
+      lastStatus:
+          SyncStatusSerializer.fromDatabase(data['last_status'] as String),
+      lastError: data['last_error'] as String?,
+    );
+  }
+
+  Future<void> upsertSyncMetadata(SyncMetadata metadata) async {
+    await customStatement(
+      'INSERT INTO sync_metadata (id, last_synced_at, last_status, last_error) '
+      'VALUES (?, ?, ?, ?) '
+      'ON CONFLICT(id) DO UPDATE SET last_synced_at=excluded.last_synced_at, last_status=excluded.last_status, last_error=excluded.last_error',
+      [
+        metadata.id,
+        metadata.lastSyncedAt?.millisecondsSinceEpoch,
+        metadata.lastStatus.dbValue,
+        metadata.lastError,
+      ],
+    );
+  }
+
+  Future<SyncSnapshot> exportSnapshot() async {
+    final clientsRows = await customSelect(
+      'SELECT * FROM clients ORDER BY created_at ASC',
+    ).get();
+    final clients = clientsRows
+        .map(
+          (row) => Client(
+            id: row.data['id'] as String,
+            nom: row.data['nom'] as String,
+            telephone: row.data['telephone'] as String,
+            region: row.data['region'] as String,
+            createdAt: DateTime.fromMillisecondsSinceEpoch(
+              row.data['created_at'] as int,
+            ),
+          ),
+        )
+        .toList();
+
+    final factures = await loadFactures();
+    final parametres = await loadParametres();
+
+    return SyncSnapshot(
+      generatedAt: DateTime.now(),
+      parametres: parametres,
+      clients: clients,
+      factures: factures,
+    );
+  }
+
+  Future<void> applySnapshot(SyncSnapshot snapshot) async {
+    await transaction(() async {
+      for (final client in snapshot.clients) {
+        await customStatement(
+          'INSERT INTO clients (id, nom, telephone, region, created_at) VALUES (?, ?, ?, ?, ?) '
+          'ON CONFLICT(id) DO UPDATE SET nom=excluded.nom, telephone=excluded.telephone, region=excluded.region, created_at=excluded.created_at',
+          [
+            client.id,
+            client.nom,
+            client.telephone,
+            client.region,
+            client.createdAt.millisecondsSinceEpoch,
+          ],
+        );
+      }
+
+      for (final facture in snapshot.factures) {
+        await customStatement(
+          'INSERT INTO factures (id, numero, date, client_id, marque, consignation, carreau, status, created_by, created_at, locked_at) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
+          'ON CONFLICT(id) DO UPDATE SET numero=excluded.numero, date=excluded.date, client_id=excluded.client_id, marque=excluded.marque, '
+          'consignation=excluded.consignation, carreau=excluded.carreau, status=excluded.status, created_by=excluded.created_by, created_at=excluded.created_at, locked_at=excluded.locked_at',
+          [
+            facture.id,
+            facture.numero,
+            facture.date.millisecondsSinceEpoch,
+            facture.clientId,
+            facture.marque,
+            facture.consignation,
+            facture.carreau,
+            facture.status.dbValue,
+            facture.createdBy,
+            facture.createdAt.millisecondsSinceEpoch,
+            facture.lockedAt?.millisecondsSinceEpoch,
+          ],
+        );
+
+        await customStatement(
+          'DELETE FROM lignes WHERE facture_id = ?',
+          [facture.id],
+        );
+
+        for (final ligne in facture.lignes) {
+          final ligneId = ligne.id.isEmpty ? _uuid.v4() : ligne.id;
+          await customStatement(
+            'INSERT INTO lignes (id, facture_id, fournisseur_id, marque, nb_colis, nature, brut, tare, net, prix_unitaire) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              ligneId,
+              facture.id,
+              ligne.fournisseurId,
+              ligne.marque,
+              ligne.nbColis,
+              ligne.nature,
+              ligne.brut,
+              ligne.tare,
+              ligne.net,
+              ligne.prixUnitaire,
+            ],
+          );
+        }
+      }
+
+      final localParams = await loadParametres();
+      final remoteParams = snapshot.parametres;
+      final nextCompteur = remoteParams.prochainCompteur > localParams.prochainCompteur
+          ? remoteParams.prochainCompteur
+          : localParams.prochainCompteur;
+
+      final merged = localParams.copyWith(
+        prefixNumero: remoteParams.prefixNumero,
+        prochainCompteur: nextCompteur,
+        carreauParDefaut: remoteParams.carreauParDefaut,
+        devise: remoteParams.devise,
+        piedDePage: remoteParams.piedDePage,
+        langue: remoteParams.langue,
+      );
+      await upsertParametres(merged);
+    });
   }
 
   Future<List<Client>> suggestClients(String pattern) async {
