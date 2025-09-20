@@ -6,6 +6,7 @@ void main() {
   group('LigneAchat', () {
     test('netNonZero uses brut - tare when net is zero', () {
       const ligne = LigneAchat(
+        id: '1',
         marque: 'DZ',
         nbColis: 10,
         nature: 'Tomates',
@@ -20,6 +21,7 @@ void main() {
 
     test('montant multiplies net by price', () {
       const ligne = LigneAchat(
+        id: '1',
         marque: 'DZ',
         nbColis: 5,
         nature: 'Tomates',

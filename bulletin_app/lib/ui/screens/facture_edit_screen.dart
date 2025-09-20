@@ -6,38 +6,38 @@ import 'package:printing/printing.dart';
 
 import '../../data/models/models.dart';
 import '../../logic/providers/app_bootstrap_provider.dart';
-import '../../logic/providers/current_bulletin_provider.dart';
+import '../../logic/providers/auth_provider.dart';
+import '../../logic/providers/current_facture_provider.dart';
 
-class BulletinEditScreen extends ConsumerStatefulWidget {
-  const BulletinEditScreen({super.key, this.bulletinId});
+class FactureEditScreen extends ConsumerStatefulWidget {
+  const FactureEditScreen({super.key, this.factureId});
 
   static const routeName = '/edit';
-  final int? bulletinId;
+  final String? factureId;
 
   @override
-  ConsumerState<BulletinEditScreen> createState() => _BulletinEditScreenState();
+  ConsumerState<FactureEditScreen> createState() => _FactureEditScreenState();
 }
 
-class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
+class _FactureEditScreenState extends ConsumerState<FactureEditScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref
-          .read(currentBulletinProvider.notifier)
-          .load(id: widget.bulletinId);
+      ref.read(currentFactureProvider.notifier).load(id: widget.factureId);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(currentBulletinProvider);
+    final state = ref.watch(currentFactureProvider);
+    final user = ref.watch(currentUserProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(state.value?.numero ?? 'Bulletin'),
+        title: Text(state.value?.facture.numero ?? 'Facture'),
         actions: [
           IconButton(
             icon: const Icon(Icons.print),
@@ -50,33 +50,60 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
         ],
       ),
       body: state.when(
-        data: (bulletin) => _buildForm(bulletin),
+        data: (form) {
+          final canEdit =
+              form.facture.status != FactureStatus.locked || user.role == UserRole.admin;
+          return _buildForm(form, canEdit);
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Erreur: $error')),
       ),
-      persistentFooterButtons: state.hasValue
-          ? [
+      persistentFooterButtons: state.when(
+        data: (form) {
+          final isLocked = form.facture.status == FactureStatus.locked;
+          final canEdit = !isLocked || user.role == UserRole.admin;
+          return [
+            ElevatedButton.icon(
+              onPressed: canEdit ? _onSave : null,
+              icon: const Icon(Icons.save),
+              label: const Text('Enregistrer'),
+            ),
+            if (!isLocked)
               ElevatedButton.icon(
-                onPressed: _onSave,
-                icon: const Icon(Icons.save),
-                label: const Text('Enregistrer'),
+                onPressed: () async {
+                  try {
+                    await ref.read(currentFactureProvider.notifier).lock();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Facture verrouillée')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text('Erreur: $e')));
+                  }
+                },
+                icon: const Icon(Icons.lock),
+                label: const Text('Verrouiller'),
               ),
-              ElevatedButton.icon(
-                onPressed: _onPrint,
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('PDF'),
-              ),
-            ]
-          : null,
+            ElevatedButton.icon(
+              onPressed: _onPrint,
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('PDF'),
+            ),
+          ];
+        },
+        loading: () => null,
+        error: (_, __) => null,
+      ),
     );
   }
 
-  Widget _buildForm(BulletinAchat bulletin) {
+  Widget _buildForm(FactureFormState form, bool canEdit) {
     final params = ref.watch(parametresProvider).maybeWhen(
           data: (value) => value,
           orElse: () => ParametresApp.defaults,
         );
-    final total = bulletin.total.toStringAsFixed(2);
+    final total = form.facture.total.toStringAsFixed(2);
 
     return FormBuilder(
       key: _formKey,
@@ -90,7 +117,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 Expanded(
                   child: FormBuilderTextField(
                     name: 'numero',
-                    initialValue: bulletin.numero,
+                    initialValue: form.facture.numero,
                     decoration: const InputDecoration(labelText: 'N°'),
                     readOnly: true,
                   ),
@@ -99,13 +126,14 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 Expanded(
                   child: FormBuilderDateTimePicker(
                     name: 'date',
-                    initialValue: bulletin.date,
+                    initialValue: form.facture.date,
                     inputType: InputType.date,
                     decoration: const InputDecoration(labelText: 'Date'),
+                    enabled: canEdit,
                     onChanged: (value) {
                       if (value != null) {
                         ref
-                            .read(currentBulletinProvider.notifier)
+                            .read(currentFactureProvider.notifier)
                             .updateHeader(date: value);
                       }
                     },
@@ -116,12 +144,13 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
             const SizedBox(height: 12),
             FormBuilderTextField(
               name: 'client',
-              initialValue: bulletin.client,
+              initialValue: form.client.nom,
               decoration:
                   const InputDecoration(labelText: 'Délivré à / إلى السيد'),
+              enabled: canEdit,
               onChanged: (value) => ref
-                  .read(currentBulletinProvider.notifier)
-                  .updateHeader(client: value ?? ''),
+                  .read(currentFactureProvider.notifier)
+                  .updateClientName(value ?? ''),
               validator: FormBuilderValidators.compose([
                 FormBuilderValidators.required(),
               ]),
@@ -132,11 +161,12 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 Expanded(
                   child: FormBuilderTextField(
                     name: 'marque',
-                    initialValue: bulletin.marque,
+                    initialValue: form.facture.marque,
                     decoration:
                         const InputDecoration(labelText: 'Marque / الأصل'),
+                    enabled: canEdit,
                     onChanged: (value) => ref
-                        .read(currentBulletinProvider.notifier)
+                        .read(currentFactureProvider.notifier)
                         .updateHeader(marque: value ?? ''),
                   ),
                 ),
@@ -144,11 +174,12 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 Expanded(
                   child: FormBuilderTextField(
                     name: 'consignation',
-                    initialValue: bulletin.consignation,
+                    initialValue: form.facture.consignation,
                     decoration:
                         const InputDecoration(labelText: 'Cons. / الضمان'),
+                    enabled: canEdit,
                     onChanged: (value) => ref
-                        .read(currentBulletinProvider.notifier)
+                        .read(currentFactureProvider.notifier)
                         .updateHeader(consignation: value ?? ''),
                   ),
                 ),
@@ -156,15 +187,16 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 Expanded(
                   child: FormBuilderTextField(
                     name: 'carreau',
-                    initialValue: bulletin.carreau.toString(),
+                    initialValue: form.facture.carreau.toString(),
                     decoration:
                         const InputDecoration(labelText: 'Carreau Nº'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) {
                       final parsed = int.tryParse(value ?? '');
                       if (parsed != null) {
                         ref
-                            .read(currentBulletinProvider.notifier)
+                            .read(currentFactureProvider.notifier)
                             .updateHeader(carreau: parsed);
                       }
                     },
@@ -175,39 +207,27 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
             const SizedBox(height: 24),
             Row(
               children: [
-                const Text('Lignes du bulletin',
+                const Text('Lignes de la facture',
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
                 IconButton(
-                  onPressed: () {
-                    ref.read(currentBulletinProvider.notifier).addLine(
-                          const LigneAchat(
-                            marque: '',
-                            nbColis: 0,
-                            nature: '',
-                            brut: 0,
-                            tare: 0,
-                            net: 0,
-                            prixUnitaire: 0,
-                          ),
-                        );
-                  },
+                  onPressed:
+                      canEdit ? () => ref.read(currentFactureProvider.notifier).addLine() : null,
                   icon: const Icon(Icons.add),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             ...List.generate(
-              bulletin.lignes.length,
-              (index) => _buildLineEditor(bulletin.lignes[index], index),
+              form.facture.lignes.length,
+              (index) => _buildLineEditor(form.facture.lignes[index], index, canEdit),
             ),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
               child: Text(
                 'TOTAL: $total ${params.devise}',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -216,8 +236,8 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
     );
   }
 
-  Widget _buildLineEditor(LigneAchat ligne, int index) {
-    final notifier = ref.read(currentBulletinProvider.notifier);
+  Widget _buildLineEditor(LigneAchat ligne, int index, bool canEdit) {
+    final notifier = ref.read(currentFactureProvider.notifier);
 
     void update({
       String? marque,
@@ -256,6 +276,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     initialValue: ligne.marque,
                     decoration:
                         const InputDecoration(labelText: 'Marque / الأصل'),
+                    enabled: canEdit,
                     onChanged: (value) => update(marque: value),
                   ),
                 ),
@@ -267,6 +288,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     decoration:
                         const InputDecoration(labelText: 'N. colis / عدد'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) =>
                         update(nbColis: int.tryParse(value) ?? ligne.nbColis),
                   ),
@@ -279,6 +301,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
               initialValue: ligne.nature,
               decoration: const InputDecoration(
                   labelText: 'Nature des produits / طبيعة المواد'),
+              enabled: canEdit,
               onChanged: (value) => update(nature: value),
             ),
             const SizedBox(height: 12),
@@ -290,6 +313,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     initialValue: ligne.brut.toStringAsFixed(2),
                     decoration: const InputDecoration(labelText: 'Brut'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) => update(
                       brut: double.tryParse(value) ?? ligne.brut,
                     ),
@@ -302,6 +326,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     initialValue: ligne.tare.toStringAsFixed(2),
                     decoration: const InputDecoration(labelText: 'Tare'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) => update(
                       tare: double.tryParse(value) ?? ligne.tare,
                     ),
@@ -314,6 +339,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     initialValue: ligne.net.toStringAsFixed(2),
                     decoration: const InputDecoration(labelText: 'Net'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) => update(
                       net: double.tryParse(value) ?? ligne.net,
                     ),
@@ -331,9 +357,10 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                     decoration:
                         const InputDecoration(labelText: 'Prix unitaire'),
                     keyboardType: TextInputType.number,
+                    enabled: canEdit,
                     onChanged: (value) => update(
-                      prixUnitaire: double.tryParse(value) ??
-                          ligne.prixUnitaire,
+                      prixUnitaire:
+                          double.tryParse(value) ?? ligne.prixUnitaire,
                     ),
                   ),
                 ),
@@ -348,17 +375,28 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
                 ),
               ],
             ),
+            if (ligne.netNonZero <= 0)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Poids net calculé automatiquement (brut - tare)',
+                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  onPressed: () => notifier.duplicateLine(index),
+                  onPressed: canEdit ? () => notifier.duplicateLine(index) : null,
                   icon: const Icon(Icons.copy),
                   tooltip: 'Dupliquer',
                 ),
                 IconButton(
-                  onPressed: () => notifier.removeLine(index),
+                  onPressed: canEdit ? () => notifier.removeLine(index) : null,
                   icon: const Icon(Icons.delete),
                   tooltip: 'Supprimer',
                 ),
@@ -376,11 +414,13 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
       return;
     }
     try {
-      final saved = await ref.read(currentBulletinProvider.notifier).save();
+      final saved = await ref.read(currentFactureProvider.notifier).save();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Enregistré')));
-      await ref.read(currentBulletinProvider.notifier).load(id: saved.id);
+      await ref
+          .read(currentFactureProvider.notifier)
+          .load(id: saved.facture.id);
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Erreur: $e')));
@@ -389,7 +429,7 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
 
   Future<void> _onPrint() async {
     try {
-      final pdf = await ref.read(currentBulletinProvider.notifier).generatePdf();
+      final pdf = await ref.read(currentFactureProvider.notifier).generatePdf();
       await Printing.layoutPdf(onLayout: (_) async => pdf);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -402,8 +442,8 @@ class _BulletinEditScreenState extends ConsumerState<BulletinEditScreen> {
 
   Future<void> _onShare() async {
     try {
-      final pdf = await ref.read(currentBulletinProvider.notifier).generatePdf();
-      await Printing.sharePdf(bytes: pdf, filename: 'bulletin.pdf');
+      final pdf = await ref.read(currentFactureProvider.notifier).generatePdf();
+      await Printing.sharePdf(bytes: pdf, filename: 'facture.pdf');
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Erreur partage: $e')));
