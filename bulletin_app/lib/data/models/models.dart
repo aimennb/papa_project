@@ -424,6 +424,9 @@ class ParametresApp extends Equatable {
   final String devise;
   final String piedDePage;
   final String langue;
+  final String remoteEndpoint;
+  final bool syncEnabled;
+  final int syncIntervalMinutes;
 
   const ParametresApp({
     required this.id,
@@ -433,6 +436,9 @@ class ParametresApp extends Equatable {
     required this.devise,
     required this.piedDePage,
     required this.langue,
+    required this.remoteEndpoint,
+    required this.syncEnabled,
+    required this.syncIntervalMinutes,
   });
 
   ParametresApp copyWith({
@@ -443,6 +449,9 @@ class ParametresApp extends Equatable {
     String? devise,
     String? piedDePage,
     String? langue,
+    String? remoteEndpoint,
+    bool? syncEnabled,
+    int? syncIntervalMinutes,
   }) {
     return ParametresApp(
       id: id ?? this.id,
@@ -452,6 +461,9 @@ class ParametresApp extends Equatable {
       devise: devise ?? this.devise,
       piedDePage: piedDePage ?? this.piedDePage,
       langue: langue ?? this.langue,
+      remoteEndpoint: remoteEndpoint ?? this.remoteEndpoint,
+      syncEnabled: syncEnabled ?? this.syncEnabled,
+      syncIntervalMinutes: syncIntervalMinutes ?? this.syncIntervalMinutes,
     );
   }
 
@@ -464,6 +476,9 @@ class ParametresApp extends Equatable {
       'devise': devise,
       'piedDePage': piedDePage,
       'langue': langue,
+      'remoteEndpoint': remoteEndpoint,
+      'syncEnabled': syncEnabled,
+      'syncIntervalMinutes': syncIntervalMinutes,
     };
   }
 
@@ -476,6 +491,9 @@ class ParametresApp extends Equatable {
       devise: json['devise'] as String,
       piedDePage: json['piedDePage'] as String,
       langue: json['langue'] as String,
+      remoteEndpoint: json['remoteEndpoint'] as String? ?? '',
+      syncEnabled: json['syncEnabled'] as bool? ?? false,
+      syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 15,
     );
   }
 
@@ -487,6 +505,9 @@ class ParametresApp extends Equatable {
     devise: 'DA',
     piedDePage: 'Après huit (8) jours, l\'emballage ne sera pas remboursé.',
     langue: 'fr',
+    remoteEndpoint: '',
+    syncEnabled: false,
+    syncIntervalMinutes: 15,
   );
 
   @override
@@ -498,7 +519,110 @@ class ParametresApp extends Equatable {
         devise,
         piedDePage,
         langue,
+        remoteEndpoint,
+        syncEnabled,
+        syncIntervalMinutes,
       ];
+}
+
+enum SyncStatus { idle, syncing, success, error, offline }
+
+extension SyncStatusSerializer on SyncStatus {
+  String get dbValue => toString().split('.').last.toUpperCase();
+
+  static SyncStatus fromDatabase(String value) {
+    switch (value.toUpperCase()) {
+      case 'SYNCING':
+        return SyncStatus.syncing;
+      case 'SUCCESS':
+        return SyncStatus.success;
+      case 'ERROR':
+        return SyncStatus.error;
+      case 'OFFLINE':
+        return SyncStatus.offline;
+      case 'IDLE':
+      default:
+        return SyncStatus.idle;
+    }
+  }
+}
+
+class SyncMetadata extends Equatable {
+  final String id;
+  final DateTime? lastSyncedAt;
+  final SyncStatus lastStatus;
+  final String? lastError;
+
+  const SyncMetadata({
+    required this.id,
+    required this.lastSyncedAt,
+    required this.lastStatus,
+    required this.lastError,
+  });
+
+  SyncMetadata copyWith({
+    DateTime? lastSyncedAt,
+    SyncStatus? lastStatus,
+    String? lastError,
+    bool clearError = false,
+  }) {
+    return SyncMetadata(
+      id: id,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      lastStatus: lastStatus ?? this.lastStatus,
+      lastError: clearError ? null : (lastError ?? this.lastError),
+    );
+  }
+
+  static const defaults = SyncMetadata(
+    id: 'default',
+    lastSyncedAt: null,
+    lastStatus: SyncStatus.idle,
+    lastError: null,
+  );
+
+  @override
+  List<Object?> get props => [id, lastSyncedAt, lastStatus, lastError];
+}
+
+class SyncSnapshot extends Equatable {
+  final DateTime generatedAt;
+  final ParametresApp parametres;
+  final List<Client> clients;
+  final List<Facture> factures;
+
+  const SyncSnapshot({
+    required this.generatedAt,
+    required this.parametres,
+    required this.clients,
+    required this.factures,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'generatedAt': generatedAt.toIso8601String(),
+      'parametres': parametres.toJson(),
+      'clients': clients.map((e) => e.toJson()).toList(),
+      'factures': factures.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory SyncSnapshot.fromJson(Map<String, dynamic> json) {
+    return SyncSnapshot(
+      generatedAt: DateTime.parse(json['generatedAt'] as String),
+      parametres:
+          ParametresApp.fromJson(json['parametres'] as Map<String, dynamic>),
+      clients: (json['clients'] as List<dynamic>)
+          .map((e) => Client.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      factures: (json['factures'] as List<dynamic>)
+          .map((e) => Facture.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [generatedAt, parametres, clients, factures];
 }
 
 enum UserRole { admin, facture, fournisseur }

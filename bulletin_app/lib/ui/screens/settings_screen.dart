@@ -90,6 +90,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             maxLines: 2,
           ),
           const SizedBox(height: 12),
+          FormBuilderTextField(
+            name: 'remoteEndpoint',
+            decoration: const InputDecoration(
+              labelText: 'Serveur de synchronisation (URL)',
+              helperText:
+                  'Exemple: https://mon-serveur/api',
+            ),
+            initialValue: params.remoteEndpoint,
+            validator: FormBuilderValidators.compose([
+              (value) {
+                final trimmed = value?.trim() ?? '';
+                if (trimmed.isEmpty) {
+                  return null;
+                }
+                final uri = Uri.tryParse(trimmed);
+                if (uri == null || !uri.hasScheme) {
+                  return 'URL invalide';
+                }
+                return null;
+              },
+            ]),
+          ),
+          const SizedBox(height: 12),
+          FormBuilderSwitch(
+            name: 'syncEnabled',
+            initialValue: params.syncEnabled,
+            title: const Text('Activer la synchronisation automatique'),
+          ),
+          const SizedBox(height: 12),
+          FormBuilderDropdown<int>(
+            name: 'syncInterval',
+            decoration: const InputDecoration(
+              labelText: 'Fréquence de synchronisation (minutes)',
+            ),
+            initialValue: params.syncIntervalMinutes,
+            items: const [5, 10, 15, 30, 60]
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text('$value minutes'),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
           FormBuilderDropdown<UserRole>(
             name: 'role',
             decoration:
@@ -135,6 +180,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       devise: values['devise'] as String? ?? initial.devise,
       langue: values['langue'] as String? ?? initial.langue,
       piedDePage: values['footer'] as String? ?? initial.piedDePage,
+      remoteEndpoint: (values['remoteEndpoint'] as String? ?? '').trim(),
+      syncEnabled: (values['syncEnabled'] as bool? ?? false) &&
+          ((values['remoteEndpoint'] as String? ?? '').trim().isNotEmpty),
+      syncIntervalMinutes:
+          values['syncInterval'] as int? ?? initial.syncIntervalMinutes,
     );
 
     try {
