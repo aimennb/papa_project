@@ -1,0 +1,12 @@
+{
+  "appTitle": "بيان الشراء",
+  "listTitle": "بيانات الشراء",
+  "newBulletin": "جديد",
+  "settings": "الإعدادات",
+  "search": "بحث",
+  "noBulletin": "لا توجد بيانات",
+  "saved": "تم الحفظ",
+  "pdfGenerated": "تم إنشاء PDF",
+  "pdfError": "خطأ في PDF",
+  "shareError": "خطأ في المشاركة"
+}

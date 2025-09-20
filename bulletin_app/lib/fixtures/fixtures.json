@@ -1,0 +1,23 @@
+{
+  "bulletins": [
+    {
+      "numero": "0006196",
+      "date": 1693180800000,
+      "client": "KHENOUCI Chabane",
+      "marque": "Tomate",
+      "consignation": "Palettes",
+      "carreau": 62,
+      "lignes": [
+        {
+          "marque": "DZ",
+          "nbColis": 12,
+          "nature": "Tomates",
+          "brut": 120.0,
+          "tare": 5.0,
+          "net": 115.0,
+          "prixUnitaire": 80.0
+        }
+      ]
+    }
+  ]
+}
