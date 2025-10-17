@@ -1,39 +1,16 @@
-// ignore: avoid_web_libraries_in_flutter, unused_import
-import 'dart:io' as io
-    if (dart.library.html) 'dart:html' as html;
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:drift/web.dart';
-import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
+import 'app_database_executor.dart';
 
 part 'app_database.g.dart';
 
 const _uuid = Uuid();
 
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final directory = await getApplicationDocumentsDirectory();
-    final file = io.File(p.join(directory.path, 'bulletins.sqlite'));
-    return NativeDatabase.createInBackground(file);
-  });
-}
-
-QueryExecutor _createExecutor() {
-  if (kIsWeb) {
-    return WebDatabase('bulletins_db');
-  }
-  return _openConnection();
-}
-
 @DriftDatabase()
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_createExecutor());
+  AppDatabase() : super(openConnection());
 
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
