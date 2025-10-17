@@ -8,9 +8,13 @@ import 'package:intl/intl.dart';
 
 import 'logic/providers/app_bootstrap_provider.dart';
 import 'logic/providers/locale_provider.dart';
+import 'ui/screens/admin_dashboard_screen.dart';
 import 'ui/screens/facture_edit_screen.dart';
 import 'ui/screens/facture_list_screen.dart';
+import 'ui/screens/role_selection_screen.dart';
 import 'ui/screens/settings_screen.dart';
+import 'ui/screens/supplier_dashboard_screen.dart';
+import 'ui/screens/vendor_dashboard_screen.dart';
 import 'ui/theming/app_theme.dart';
 
 void main() {
@@ -48,20 +52,36 @@ class BulletinApp extends ConsumerWidget {
       ],
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case AdminDashboardScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const AdminDashboardScreen(),
+            );
           case FactureEditScreen.routeName:
             return MaterialPageRoute(
               builder: (_) => FactureEditScreen(
                 factureId: settings.arguments as String?,
               ),
             );
+          case RoleSelectionScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const RoleSelectionScreen(),
+            );
           case SettingsScreen.routeName:
             return MaterialPageRoute(builder: (_) => const SettingsScreen());
+          case SupplierDashboardScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const SupplierDashboardScreen(),
+            );
+          case VendorDashboardScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const VendorDashboardScreen(),
+            );
           case FactureListScreen.routeName:
           default:
             return MaterialPageRoute(builder: (_) => const FactureListScreen());
         }
       },
-      initialRoute: FactureListScreen.routeName,
+      initialRoute: RoleSelectionScreen.routeName,
       builder: (context, child) {
         final direction = locale.languageCode == 'ar'
             ? ui.TextDirection.rtl
