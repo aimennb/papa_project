@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/models/models.dart';
 import '../../data/repositories/sync_repository.dart';
+import '../../logic/providers/app_bootstrap_provider.dart';
 import '../../logic/providers/current_facture_provider.dart';
 import '../../logic/providers/factures_list_provider.dart';
 import '../../logic/providers/sync_controller.dart';

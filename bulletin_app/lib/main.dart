@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -62,8 +64,8 @@ class BulletinApp extends ConsumerWidget {
       initialRoute: FactureListScreen.routeName,
       builder: (context, child) {
         final direction = locale.languageCode == 'ar'
-            ? TextDirection.rtl
-            : TextDirection.ltr;
+            ? ui.TextDirection.rtl
+            : ui.TextDirection.ltr;
         return Directionality(textDirection: direction, child: child!);
       },
     );
