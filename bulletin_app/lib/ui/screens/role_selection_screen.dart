@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'admin_dashboard_screen.dart';
+import 'facture_list_screen.dart';
 import 'supplier_dashboard_screen.dart';
-import 'vendor_dashboard_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -28,7 +28,7 @@ class RoleSelectionScreen extends StatelessWidget {
             _RoleCard(
               title: 'Vendeur',
               description: 'Créer et consulter les factures de vente.',
-              routeName: VendorDashboardScreen.routeName,
+              routeName: FactureListScreen.routeName,
             ),
             SizedBox(height: 16),
             _RoleCard(
@@ -60,7 +60,7 @@ class _RoleCard extends StatelessWidget {
       elevation: 3,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => Navigator.of(context).pushNamed(routeName),
+        onTap: () => Navigator.of(context).pushReplacementNamed(routeName),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
