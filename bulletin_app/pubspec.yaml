@@ -40,4 +40,8 @@ flutter:
   assets:
     - assets/logo/
     - assets/fonts/
+    - packages/drift/web/worker.dart.js
+    - packages/drift/web/worker.dart.js.map
+    - packages/drift/web/wasm/sql-wasm.wasm
+    - packages/drift/web/wasm/sql-wasm.js
   generate: true
