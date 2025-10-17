@@ -270,45 +270,41 @@ class AppDatabase extends _$AppDatabase {
   Future<Facture> insertFacture(Facture facture) async {
     return transaction(() async {
       final factureId = facture.id.isEmpty ? _uuid.v4() : facture.id;
-      await customInsert(
+      await customStatement(
         'INSERT INTO factures (id, numero, date, client_id, marque, consignation, carreau, status, created_by, created_at, locked_at) '
         'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        variables: [
-          Variable.withString(factureId),
-          Variable.withString(facture.numero),
-          Variable.withInt(facture.date.millisecondsSinceEpoch),
-          Variable.withString(facture.clientId),
-          Variable.withString(facture.marque),
-          Variable.withString(facture.consignation),
-          Variable.withInt(facture.carreau),
-          Variable.withString(facture.status.dbValue),
-          Variable.withString(facture.createdBy),
-          Variable.withInt(facture.createdAt.millisecondsSinceEpoch),
-          facture.lockedAt != null
-              ? Variable.withInt(facture.lockedAt!.millisecondsSinceEpoch)
-              : const Variable<int?>(null),
+        [
+          factureId,
+          facture.numero,
+          facture.date.millisecondsSinceEpoch,
+          facture.clientId,
+          facture.marque,
+          facture.consignation,
+          facture.carreau,
+          facture.status.dbValue,
+          facture.createdBy,
+          facture.createdAt.millisecondsSinceEpoch,
+          facture.lockedAt?.millisecondsSinceEpoch,
         ],
-        updates: {},
       );
 
       for (final ligne in facture.lignes) {
         final ligneId = ligne.id.isEmpty ? _uuid.v4() : ligne.id;
-        await customInsert(
+        await customStatement(
           'INSERT INTO lignes (id, facture_id, fournisseur_id, marque, nb_colis, nature, brut, tare, net, prix_unitaire) '
           'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(ligneId),
-            Variable.withString(factureId),
-            Variable<String?>(ligne.fournisseurId),
-            Variable.withString(ligne.marque),
-            Variable.withInt(ligne.nbColis),
-            Variable.withString(ligne.nature),
-            Variable.withReal(ligne.brut),
-            Variable.withReal(ligne.tare),
-            Variable.withReal(ligne.net),
-            Variable.withReal(ligne.prixUnitaire),
+          [
+            ligneId,
+            factureId,
+            ligne.fournisseurId,
+            ligne.marque,
+            ligne.nbColis,
+            ligne.nature,
+            ligne.brut,
+            ligne.tare,
+            ligne.net,
+            ligne.prixUnitaire,
           ],
-          updates: {},
         );
       }
 
@@ -342,22 +338,21 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('DELETE FROM lignes WHERE facture_id = ?', [facture.id]);
       for (final ligne in facture.lignes) {
         final ligneId = ligne.id.isEmpty ? _uuid.v4() : ligne.id;
-        await customInsert(
+        await customStatement(
           'INSERT INTO lignes (id, facture_id, fournisseur_id, marque, nb_colis, nature, brut, tare, net, prix_unitaire) '
           'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(ligneId),
-            Variable.withString(facture.id),
-            Variable<String?>(ligne.fournisseurId),
-            Variable.withString(ligne.marque),
-            Variable.withInt(ligne.nbColis),
-            Variable.withString(ligne.nature),
-            Variable.withReal(ligne.brut),
-            Variable.withReal(ligne.tare),
-            Variable.withReal(ligne.net),
-            Variable.withReal(ligne.prixUnitaire),
+          [
+            ligneId,
+            facture.id,
+            ligne.fournisseurId,
+            ligne.marque,
+            ligne.nbColis,
+            ligne.nature,
+            ligne.brut,
+            ligne.tare,
+            ligne.net,
+            ligne.prixUnitaire,
           ],
-          updates: {},
         );
       }
       final updated = await findFacture(facture.id);
@@ -678,7 +673,8 @@ class AppDatabase extends _$AppDatabase {
     final countRow = await customSelect(
       'SELECT COUNT(*) AS total FROM factures',
     ).getSingleOrNull();
-    final count = (countRow?['total'] as int?) ?? 0;
+    final countData = countRow?.data;
+    final count = (countData?['total'] as int?) ?? 0;
     if (count > 0) {
       return;
     }
